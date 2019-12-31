@@ -2,7 +2,7 @@
 /*                                                                         */
 /*  Program: arteries.C (Linear elastic B)                                 */
 /*  Version: 1.0                                                           */
-/*  Date: 13 Sept. 2019                                                    */
+/*  Date: 30 Dec. 2019                                                     */
 /*                                                                         */
 /*  Primary Authors: M.S. Olufsen                                          */
 /*  Key Contributers: M.U. Qureshi & M.J. Colebank                         */
@@ -36,6 +36,7 @@
 
 using namespace std;
 
+extern double Fcst;
 extern int nbrves;
 extern int tmstps;
 extern char* CO_filename;
@@ -75,7 +76,6 @@ Tube :: Tube (double Length,
   // Initialization of the basic parameters
   N	  = int(pts*L);
   h	  = 1.0/pts/Lr;
-  //printf("N:  %d    h:  %f.3      \n",N,h); 
 
   // Declaration and Initialization of the needed intermediate arrays.
   Qnew	  = new double[N+1];
@@ -293,7 +293,7 @@ void Tube :: printPA (FILE *fd, int i)
 void Tube :: printdQdx (FILE *fd, double t, int i)
 {
   fprintf (fd, "%13.10f %15.10f\n", t,
-           (Qnew[i+1]-Qnew[i-1])/2/h);
+           (Qnew[i+1]-Qnew[i-1])/2.0/h);
 
 }
 
@@ -306,7 +306,7 @@ void Tube :: printdAdt (FILE *fd, double t, int i, double Aprev, double tmst)
 void Tube :: printTotConRes (FILE *fd, double t, int i, double Aprev, double tmst)
 {
   fprintf (fd, "%13.10f %15.10f\n", t,
-          (Qnew[i+1] - Qnew[i-1])/2/h +
+          (Qnew[i+1] - Qnew[i-1])/2.0/h +
           (Anew[i]-Aprev)/tmst);
 }
 
@@ -320,14 +320,14 @@ void Tube :: printdQdt (FILE *fd, double t, int i, double Qprev, double tmst)
 void Tube :: printddxQ2divA (FILE *fd, double t, int i)
 {
   fprintf (fd, "%13.10f %15.10f\n", t,
-           (sq(Qnew[i+1])/Anew[i+1] - sq(Qnew[i-1])/Anew[i-1])/2/h);
+           (sq(Qnew[i+1])/Anew[i+1] - sq(Qnew[i-1])/Anew[i-1])/2.0/h);
 
 }
 
 void Tube :: printdPdx (FILE *fd, double t, int i)
 {
     fprintf (fd, "%13.10f %15.10f\n", t,
-             Anew[i]*(P(i+1,Anew[i+1])-P(i-1,Anew[i-1]))/Fr2/2/h);
+             Anew[i]*(P(i+1,Anew[i+1])-P(i-1,Anew[i-1]))/Fr2/2.0/h);
 }
 
 void Tube :: printFric (FILE *fd, double t, int i)
@@ -339,8 +339,8 @@ void Tube :: printFric (FILE *fd, double t, int i)
 void Tube :: printTotMomRes (FILE *fd, double t, int i, double Qprev, double tmst)
 {
   fprintf (fd, "%13.10f %15.10f\n", t,
-           Anew[i]*(P(i+1,Anew[i+1])-P(i-1,Anew[i-1]))/Fr2/2/h +
-           (sq(Qnew[i+1])/Anew[i+1] - sq(Qnew[i-1])/Anew[i-1])/2/h +
+           Anew[i]*(P(i+1,Anew[i+1])-P(i-1,Anew[i-1]))/Fr2/2.0/h +
+           (sq(Qnew[i+1])/Anew[i+1] - sq(Qnew[i-1])/Anew[i-1])/2.0/h +
            (Qnew[i]-Qprev)/tmst + F(Qnew[i],Anew[i]));
 }
 
@@ -353,14 +353,12 @@ void Tube :: printTotMomRes (FILE *fd, double t, int i, double Qprev, double tms
 // and D2.1-4.
 double Tube :: P (int i, double A)
 {
-//  double pold = fr[i]*(1.0-sqrt(A0[i]/A)); // Linear A
 double pold = fr[i]*(sqrt(A/A0[i])-1.0);  // Linear B
   return pold;
 }
 
 double Tube :: dPdA (int i, double A)
 {
-//   double pold = 0.5*fr[i]*sqrt(A0[i]/cu(A)); // Linear A
     double pold = 0.5*fr[i]/sqrt(A0[i]*A);  // Linear B
 
   return pold;
@@ -369,14 +367,12 @@ double Tube :: dPdA (int i, double A)
 double Tube :: dPdx1(int i, double A)
 {
  
-//  double pold = (dfrdr0[i]*(1.0-sqrt(A0[i]/A))-fr[i]*sqrt(M_PI/A))*dr0dx[i]; // Linear A
     double pold = (dfrdr0[i]*(sqrt(A/A0[i])-1)-fr[i]*sqrt(M_PI*A)/A0[i])*dr0dx[i];  // Linear B
     return pold;
 }
 
 double Tube :: B (int i, double A)
 {
-//  double pold = fr[i]*(sqrt(A0[i]*A)-A0[i])/Fr2; // Linear A
     double pold = fr[i]*(sqrt(cu(A)/A0[i])-A0[i])/Fr2/3.0;  // Linear B
 
   return pold;
@@ -386,7 +382,6 @@ double Tube :: Bh (int i, double A)
 {
    int ip1 = i+1;
     
-//   double pold =  frh[ip1]*(sqrt(A0h[ip1]*A)-A0h[ip1])/Fr2; // Linear A
     double pold = frh[ip1]*(sqrt(cu(A)/A0h[ip1])-A0h[ip1])/Fr2/3.0;  // Linear B
 
    return pold;
@@ -397,7 +392,6 @@ double Tube :: dBdx1 (int i, double A)
     double dfr = dfrdr0[i];
     double inteval = 2.0*M_PI*r0[i]*fr[i]+A0[i]*dfr;
     
-//    double pold = dr0dx[i]*(2.0*sqrt(A)*(sqrt(M_PI)*fr[i]+sqrt(A0[i])*dfr)- A*dfr - inteval)/Fr2;  // Linear A
     double pold = dr0dx[i]*(2.0*sqrt(cu(A))*(sqrt(M_PI)*fr[i]-sqrt(A0[i])*dfr)/A0[i]/3.0 + A*dfr - inteval/3.0)/Fr2; // Linear B
     
 
@@ -411,7 +405,6 @@ double Tube :: dBdx1h (int i, double A)
     double dfr = dfrdr0h[ip1];
     double inteval = 2.0*M_PI*r0h[ip1]*frh[ip1]+A0h[ip1]*dfr;
     
-//    double pold = dr0dxh[ip1]*(2.0*sqrt(A)*(sqrt(M_PI)*frh[ip1]+sqrt(A0h[ip1])*dfr)- A*dfr - inteval)/Fr2;  // Linear A
     double pold = dr0dxh[ip1]*(2.0*sqrt(cu(A))*(sqrt(M_PI)*frh[ip1]-sqrt(A0h[ip1])*dfr)/A0h[ip1]/3.0 + A*dfr - inteval/3.0)/Fr2; // Linear B
 
   return pold;
@@ -421,7 +414,6 @@ double Tube :: dBdAh (int i, double A)
 {
   int ip1      = i+1;
     
-//    double pold = 0.5*frh[ip1]*sqrt(A0h[ip1]/A)/Fr2;  // Linear A
     double pold = 0.5*frh[ip1]*sqrt(A/A0h[ip1])/Fr2;  // Linear B
 
   return pold;
@@ -429,12 +421,9 @@ double Tube :: dBdAh (int i, double A)
 
 double Tube :: d2BdAdxh (int i, double A)
 {
-   int ip1      = i+1;
-   
-   double dfr = dfrdr0h[ip1];
-    
-//    double pold = (-dfr+1.0/sqrt(A)*(sqrt(M_PI)*frh[ip1] + sqrt(A0h[ip1])*dfr))*dr0dxh[ip1]/Fr2;  // Linear A
-    double pold = (dfr+sqrt(A)*(sqrt(M_PI)*frh[ip1] - sqrt(A0h[ip1])*dfr)/A0h[ip1])*dr0dxh[ip1]/Fr2;
+   int ip1     = i+1;
+   double dfr  = dfrdr0h[ip1];
+   double pold = (dfr+sqrt(A)*(sqrt(M_PI)*frh[ip1] - sqrt(A0h[ip1])*dfr)/A0h[ip1])*dr0dxh[ip1]/Fr2;
    return pold;
 }
 
@@ -485,7 +474,9 @@ double Tube :: Svec (int k, int i, int j, double Q, double A)
 // of the vessel at (t+k), where k is the length of the current
 // time-step. This function saves the results in the arrays Anew and
 // Qnew, and the function is made according to Lax-Wendroff's method
-// as described in IMFUFATEKST no 297 and D2.1-4.
+// as described in Olufsen, et al., Ann Biomed Eng 28, 1281?1299, 2000. 
+
+
 void Tube :: step (double k)
 {
   double theta = k/h;    // Theta is determined.
@@ -542,24 +533,9 @@ double Tube :: Q0_init (double t, double k, double Period)
 // the flow rate at the next time-step. From this the value of A is predicted
 // using Lax-Wendroff's numerical scheme. This function is only relevant
 // when the tube is an inlet vessel.
-//void Tube :: bound_left (double t, double k, double Period)
-//{
-//    Qnew[0]   = Q0_init(t,k,Period);
-//
-//    if (int(t/k) < 0)
-//
-//        printf("t/k negative in bound_left\n");
-//
-//    double qS, aS, cS, HnS, uS;
-//    qS = aS = cS = HnS = 0.0;
-//    negchar(k/h, qS, aS, cS, HnS);
-//    uS = qS/aS;
-//    Anew[0]   = aS + (Qnew[0] - qS)/(uS + cS) + k*HnS;
-//}
-
-// USE CHARACTERISTICS AT THE LEFT BOUNDARY!!! MJC/MUQ
 void Tube :: bound_left (double t, double k, double Period)
 {
+    
     Qnew[0]   = Q0_init(t,k,Period);
     
     if (int(t/k) < 0)
@@ -578,11 +554,10 @@ void Tube :: bound_left (double t, double k, double Period)
 // into further branches.
 // In that situation the bifurcation boundary function should be called
 // instead. Again the procedure specified is given according to the mathemati-
-// cal theory presented in IMFUFATEKST no 297 and D2.1-4.
+// cal theory presented in Olufsen, et al., Ann Biomed Eng 28, 1281?1299, 2000.
 
 double Tube :: c (int i, double A) // The wave speed through aorta.
 {
-//    double cnst =  0.5*fr[i]*sqrt(A0[i]/A)/Fr2; //Linear A
     double cnst =  0.5*fr[i]*sqrt(A/A0[i])/Fr2;  //Linear B
   return sqrt (cnst);
 }
@@ -687,7 +662,7 @@ void Tube :: bound_right (double k, double theta, double t)
     }
 }
 
-// The value at the bifurcation point at time t is predicted. NB: This should
+// The value at the bifurcation point at time t is predicted. This should
 // only be done for tubes that do bifurcate into further branches. If
 // this is not the case we have a terminal vessel and bound_right should be
 // called instead. The procedure operates according to the specifications
@@ -888,27 +863,26 @@ void Tube :: bound_bif (double theta, double gamma)
     fjac[ 9][11] = 0.5;
 
     fjac[ 4][12] = -1.0;
-    fjac[16][12] = LD->dPdA(0,xb[12]);// - sq(xb[3])/cu(xb[12]);
+    fjac[16][12] = LD->dPdA(0,xb[12]);
 
     fjac[10][13] = -1.0;
-    fjac[14][13] = LD->dPdA(0,xb[13]);// - sq(xb[4])/cu(xb[13]);
+    fjac[14][13] = LD->dPdA(0,xb[13]);
 
     fjac[ 1][14] = theta*( -sq(xb[5]/xb[14]) + LD->dBdAh(-1,xb[14])) +
       gamma*(dFdA(xb[5],xb[14]) + LD->d2BdAdxh(-1,xb[14]));
     fjac[10][14] = 0.5;
 
     fjac[ 5][15] = -1.0;
-    fjac[17][15] = RD->dPdA(0,xb[15]);// - sq(xb[6])/cu(xb[15]);
+    fjac[17][15] = RD->dPdA(0,xb[15]);
 
     fjac[11][16] = -1.0;
-    fjac[15][16] = RD->dPdA(0,xb[16]);// - sq(xb[7])/cu(xb[16]);
+    fjac[15][16] = RD->dPdA(0,xb[16]);
 
     fjac[ 2][17] = theta*( -sq(xb[8]/xb[17]) + RD->dBdAh(-1,xb[17])) +
       gamma*(dFdA(xb[8],xb[17]) + RD->d2BdAdxh(-1,xb[17]));
     fjac[11][17] = 0.5;
 
     // Check whether solution is close enough. If not run the loop again.
-    // int ch = zero (xb, 18, 1.0e-4, 1.0e-4, fvec, fjac);
     int ch = zero (xb, 18, 1.0e-12, 1.0e-12, fvec, fjac);
     if (ch == 1) ok = true;
 
@@ -937,7 +911,7 @@ void Tube :: bound_bif (double theta, double gamma)
 // right boundaries. This is carried out as long as the time hasn't passed
 // the desired ending time (tend) which is passed to the function as a
 // parameter.
-void solver (Tube *Arteries[], double tstart, double tend, double k)
+void solver (Tube *Arteries[], double tstart, double tend, double k, double Period)
 {
   // The following definitions only used when a variable time-stepping is
   // used.
@@ -965,12 +939,14 @@ void solver (Tube *Arteries[], double tstart, double tend, double k)
         error("arteries.C","Step-size too large CFL-condition violated\n");
           exit(1);
       }
+      
     }
 
     // solve for interior points, by calling step.
     for (int i=0; i<nbrves; i++)
     {
       Arteries[i] -> step (k);
+
     }
     // Update left and right boundaries, and the bifurcation points.
     Arteries[0] -> bound_left(t+k, k, Period);
@@ -983,12 +959,13 @@ void solver (Tube *Arteries[], double tstart, double tend, double k)
       else
       {
         double theta = k/Arteries[i]->h;
-	double gamma = k/2;
+        double gamma = k/2;
         Arteries[i] -> bound_bif (theta, gamma);
       }
     }
     // Update the time and position within one period.
     t = t + k;
     qLnb = (qLnb + 1) % tmstps;
+
   }
 }

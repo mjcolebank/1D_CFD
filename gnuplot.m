@@ -1,4 +1,3 @@
-function [X,Y,Z1,Z2,Z3,Z4] = gnuplot (A)
 % GNUPLOT
 %
 %  [X,Y,Z1,Z2,Z3, Z4] = gnuplot (A)
@@ -11,6 +10,9 @@ function [X,Y,Z1,Z2,Z3,Z4] = gnuplot (A)
 % A can be input with load fname -ascii
 % 
 % Output can be used with mesh(X,Y,Z) and similar routines.
+
+
+function [X,Y,Z1,Z2,Z3,Z4] = gnuplot (A)
 
 [height,width] = size(A);
 if(width ~= 6)

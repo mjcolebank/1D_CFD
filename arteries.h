@@ -2,7 +2,7 @@
 /*                                                                         */
 /*  Program: arteries.h                                                    */
 /*  Version: 1.0                                                           */
-/*  Date: 13 Sept. 2019                                                    */
+/*  Date: 30 Dec. 2019                                                     */
 /*                                                                         */
 /*  Primary Authors: M.S. Olufsen                                          */
 /*  Key Contributers: M.U. Qureshi & M.J. Colebank                         */
@@ -22,7 +22,7 @@
 
 // Global parameters imported from main.h
 
-extern double   conv, rho, mu, mu_pl, nu, Lr, Lr2, Lr3, g, q, Fr2,
+extern double   conv, rho, mu, nu, Lr, Lr2, Lr3, g, q, Fr2,
                 Re, p0, pmean, tmst, Period, Fcst, CO, COm,
                 Deltat, tau, m1, m2, m3, m4,
 	        *fjac[18], xr, f, df;
@@ -196,6 +196,6 @@ private:
   double Q0_init (double t, double k, double Period);
 };
 
-void solver (Tube *Arteries[], double tstart, double tend, double k);
+void solver (Tube *Arteries[], double tstart, double tend, double k, double Period);
 
 #endif

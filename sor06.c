@@ -2,7 +2,7 @@
 /*                                                                         */
 /* The sor06.C main program                                                */
 /*  Version: 1.0                                                           */
-/*  Date: 13 Sept. 2019                                                    */
+/*  Date: 30 Dec. 2019                                                     */
 /*                                                                         */
 /*  Primary Authors: M.S. Olufsen                                          */
 /*  Key Contributers: M.U. Qureshi & M.J. Colebank                         */
@@ -32,31 +32,42 @@ int main(int argc, char *argv[])
     double tstart, tend, finaltime;
     
     double f1, f2, f3;
-    int HB, total_vessels, total_terminal, total_conn,number_of_points;
+    double Tper, Period, k, Deltat;
+    int total_vessels, total_terminal, total_conn,number_of_points;
     
     //==========adjustment in resistances (WK parameters) for the control========
     
     
-    if (argc != 7) //argv[0] is the name of the program, here sor06
+    if (argc != 8) //argv[0] is the name of the program, here sor06
     {
-        printf("Not enough input arguments, noargc %d and they are %s\n", argc, argv[0]);
+        printf("Not enough input arguments: only noargc %d but require %d\n", argc, 8);
         return 1;
     }
     
-    f1 = atof(argv[1]);
-    f2 = atof(argv[2]);
-    f3 = atof(argv[3]);
-    HB = atoi(argv[4]);
-    total_vessels  = atoi(argv[5]);
-    total_terminal = atoi(argv[6]);
-    total_conn     = total_vessels-total_terminal;
+    f1   = atof(argv[1]);
+    f2   = atof(argv[2]);
+    f3   = atof(argv[3]);
+    Tper = atof(argv[4]);
+    
+    
+    total_vessels    = atoi(argv[5]);
+    total_terminal   = atoi(argv[6]);
+    number_of_points = atoi(argv[7]);
+    
+    total_conn         = total_vessels-total_terminal;
     nbrves             = total_vessels;
-    number_of_points  = 8;
     
+    printf("f1 f2 f3 Tper: %lf %lf %lf %lf,\n vessels, terminal, numpts: %d, %d, %d\n",f1, f2, f3, Tper, total_vessels, total_terminal, number_of_points);
     
+    // Originally in sor06.h
+    Period = Tper*q/Lr3;            // The dimension-less period.
+    k      = Period/tmstps;         // Length of a timestep.
+    Deltat = Period/plts;           // Interval between each point plottet.
     
     /* Declare string vectors and files to hold 
-     * the output from the model               */
+     * the output from the model. This can 
+     * be expanded to have more vessels
+     */
     char nameart1 [20];
     char nameart2 [20];
     char nameart3 [20];
@@ -76,28 +87,26 @@ int main(int argc, char *argv[])
     // Workspace used by bound_bif
     for(int i=0; i<18; i++) fjac[i] = new double[18];
     tstart    = 0.0;            // Starting time.
-    finaltime = HB*Period;      // Final end-time during a simulation.
-    tend      = (HB-1)*Period;  // Timestep before the first plot-point
-                                // is reached.
     
     // The number of vessels in the network is given when the governing array of
     // vessels is declared.
     
 // =========================NETWORK =================================================================================
     
-    Tube   *Arteries[nbrves];                    // Array of blood vessels.
-    int conn_rows = (total_vessels-1)/2;
-    int conn_cols = 3;
-    int connectivity_matrix[conn_rows][conn_cols];
-    double bc_matrix[total_terminal][3];
-    int terminal_vessels[total_terminal];
-    double dimensions_matrix[total_vessels][3];
+    Tube   *Arteries[nbrves];                     // Array of blood vessels.
+    int conn_rows = (total_vessels-1)/2;          // Number of rows
+    int conn_cols = 3;                            // Number of columns
+    int connectivity_matrix[conn_rows][conn_cols];// Matrix with vessels
+    double bc_matrix[total_terminal][3];          // WK bound. matrix
+    int terminal_vessels[total_terminal];         // ID's for term. ves.
+    double dimensions_matrix[total_vessels][3];   // Length and radius
+    
     FILE *conn;
     conn = fopen("connectivity.txt","rt");
     int parent, daughter1, daughter2, r_in;
     int conn_id = 0;
     
-    // Check to see if we have the connecitivity file
+    // Check to see if we have the connectivity file
    if (conn == NULL)
    {
        fprintf(stdout,"Error: Connectivity File Does Not Exist \n");
@@ -122,7 +131,6 @@ int main(int argc, char *argv[])
    }
     for (int i=0; i<total_terminal; i++){
         fscanf(BCs, "%lf %lf %lf",&bc_matrix[i][0],&bc_matrix[i][1],&bc_matrix[i][2]);
-        //printf("BCs:   %lf    %lf    %lf     \n",bc_matrix[i][0],bc_matrix[i][1],bc_matrix[i][2]);
     }
     
     fclose(BCs);
@@ -134,7 +142,6 @@ int main(int argc, char *argv[])
     terminal_file = fopen("terminal_vessels.txt","rt");
     for (int i=0; i<total_terminal; i++){
         fscanf(terminal_file, "%d", &terminal_vessels[i]);
-        //printf("terminal vessels: %d\n",terminal_vessels[i]);
     }
     fclose(terminal_file);
     
@@ -144,15 +151,13 @@ int main(int argc, char *argv[])
     dim_file = fopen("Dimensions.txt","rt");
     for (int dim_ID = 0; dim_ID < total_vessels; dim_ID++){
         fscanf(dim_file, "%5lf %5lf %5lf", &dimensions_matrix[dim_ID][0],&dimensions_matrix[dim_ID][1],&dimensions_matrix[dim_ID][2]);
-        printf("Length: %lf    Rin: %lf   Rout: %lf\n", dimensions_matrix[dim_ID][0],dimensions_matrix[dim_ID][1],dimensions_matrix[dim_ID][2]);
     }
     fclose(dim_file);
     
     
     // Initialization of the Arteries.
-    // Definition of Class Tube: (Length, topradius, botradius, *LeftDaughter, *RightDaughter, rmin, points, init, K, f1, f2, f3, R1, R2,  CT, LT);
-    /////////////// Create a dynamic network (Arteries[1] = new Tube( L1, R1, R1, Arteries[ 2], Arteries[ 3], rm, 40, 0, 0,f1,f2,f3, 0, 0, 0, 0);)
-    /*                 FORWARD VERSION             */
+    // Definition of Class Tube: (Length, topradius, botradius, *LeftDaughter, *RightDaughter,
+    //                              points, init, f1, f2, f3, R1, R2,  CT);
     int curr_d1, curr_d2;
     double R1, R2, CT;
     int term_id = total_terminal-1;
@@ -167,6 +172,9 @@ int main(int argc, char *argv[])
         Arteries[0] = new Tube( dimensions_matrix[0][0], dimensions_matrix[0][1], dimensions_matrix[0][2], 0, 0, number_of_points, 1,f1,f2,f3, R1, R2, CT);
     }
     else if (total_vessels > 1){
+        // NOTE: In order to set up the tube class, vessels must be initilized
+        // starting from the most termin vessel (the vessel with the largest
+        // ID number), and then works back to the root vessel in the network.
         for (int i=total_vessels-1; i>=0; i--) {
             //// Define the connecitivity between the vessels
             if (i == connectivity_matrix[conn_id][0])
@@ -177,6 +185,7 @@ int main(int argc, char *argv[])
             }
             //first vessels
             if (i==0) {
+                printf("Root Vessel: L, Rin, Rout: %lf %lf %lf\n",dimensions_matrix[i][0], dimensions_matrix[i][1], dimensions_matrix[i][2]);
                 Arteries[i] = new Tube( dimensions_matrix[i][0], dimensions_matrix[i][1], dimensions_matrix[i][2], Arteries[ curr_d1], Arteries[ curr_d2], number_of_points, 1, f1,f2,f3, 0, 0, 0);
             }
             else{
@@ -193,21 +202,74 @@ int main(int argc, char *argv[])
                     Arteries[i] = new Tube( dimensions_matrix[i][0], dimensions_matrix[i][1], dimensions_matrix[i][2], Arteries[ curr_d1], Arteries[ curr_d2], number_of_points, 0, f1,f2,f3, 0, 0, 0);
                 }
             }
-    
         }
-    
     }
 
     
-    // Solves the equations until time equals tend.
-    solver (Arteries, tstart, tend, k);
-    tstart = tend;
-    tend = tend + Deltat;
+    // Solves the equations until time equals tend.///////////////////////////
+    /* ADDED BY M. J. Colebank
+     * Rather than specifying the number of cycles as an input to the function,
+     * we want to test to see if the solution has converged. If so, we should exit.*/
     
-    // The loop is continued until the final time
-    // is reached. If one wants to make a plot of
-    // the solution versus x, tend is set to final-
-    // time in the above declaration.
+    int period_counter = 1; // Count the number of periods you have solved for
+    double norm_sol = 1e+6;
+    double sol_tol  = 1e+1;
+    printf("NORM_SOL: %f\n",norm_sol);
+    double sol_p1[tmstps],sol_p2[tmstps];
+    tend      = Deltat;
+    
+    
+    // SOLVE THE MODEL ONCE
+    // Note: Only want to test the pressure at the inlet
+    int sol_ID = 0;
+    while (tend<=period_counter*Period)
+    {
+    solver (Arteries, tstart, tend, k, Period); 
+    sol_p1[sol_ID] = Arteries[0]->P(0,Arteries[0]->Anew[0]); // for printing
+    sol_p1[sol_ID] *= rho*g*Lr/conv;
+    tstart = tend;
+    tend   = tend + Deltat; // The current ending time is increased by Deltat.
+    sol_ID++;
+    }
+    
+    
+    // LOOP FOR CONVERGENCE
+    double sse;
+    while (norm_sol>=sol_tol)
+    {
+        sol_ID = 0;
+        sse    = 0;
+        period_counter++;
+        if (period_counter>max_cycles)
+        {
+            printf("ERROR: TOO MANY CYCLES. EXITING. \n");
+            return 1;
+        }
+        while (tend<=period_counter*Period)
+        {
+            solver (Arteries, tstart, tend, k, Period);
+            sol_p2[sol_ID] = Arteries[0]->P(0,Arteries[0]->Anew[0]); // for printing
+            sol_p2[sol_ID] *= rho*g*Lr/conv;
+            sse = sse+ sq(sol_p1[sol_ID]-sol_p2[sol_ID]);
+            tstart = tend;
+            tend   = tend + Deltat; // The current ending time is increased by Deltat.
+            sol_ID++;
+        }
+        norm_sol = sse;
+        memcpy (sol_p1, sol_p2, sizeof(sol_p2));
+        printf("NORM OF SOLN DIFF:%f\n",norm_sol);
+    }
+    printf("final num cylces:%d\n",period_counter);
+    
+
+    //////////////////////////////////////////////
+  // The loop is continued until the final time
+  // is reached. If one wants to make a plot of
+  // the solution versus x, tend is set to final-
+  // time in the above declaration.
+  
+  period_counter++;
+  finaltime = (period_counter+(cycles-1))*Period;
     while (tend <= finaltime)
     {
         for (int j=0; j<nbrves; j++)
@@ -221,7 +283,7 @@ int main(int argc, char *argv[])
         }
         
         // Solves the equations until time equals tend.
-        solver (Arteries, tstart, tend, k);
+        solver (Arteries, tstart, tend, k, Period);
         
         // A 2D plot of P(x_fixed,t) is made. The resulting 2D graph is due to
         // the while loop, since for each call of printPt only one point is set.
